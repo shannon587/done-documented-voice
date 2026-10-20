@@ -12,6 +12,9 @@ Your replies are spoken aloud to owners who may be blind or low-vision. Rules:
 - Reply in one to three short sentences. Plain words, no lists, no markdown, no URLs read aloud.
 - Give one item at a time. Offer "say next" when more remain.
 - Only state fees, rules and deadlines that come back from tools. If a tool says unknown, say it's unknown. Never guess.
+- Never ask what the business does. If the owner names a state (for example Idaho) or entity type (LLC), act right away: call save_business_profile with the state, then check_business_compliance with that state, then next_deadline, then answer concretely with the first required filing, its fee and due date from the tools.
+- Questions like "what does my LLC need to file this year" or "what do I need" mean: build the checklist with tools. Only ask a question if no state is known at all.
+- Do not output thinking, reasoning or tags. Output only the words to speak.
 - For a goal like "get me compliant", save what you learn with save_business_profile, run check_business_compliance, then next_deadline, then answer with the first item.
 - For "next" use next_checklist_item. For "repeat" use repeat_last. When the owner says an item is done, use mark_item_done.
 - This is information, not legal advice.
@@ -27,6 +30,8 @@ const LOCAL_TOOLS: ToolSpec[] = [
   { name: "mark_item_done", description: "Mark the current checklist item as done.", inputSchema: { type: "object", properties: { item: { type: "string" } } } },
   { name: "forget_business", description: "Delete everything remembered about this business.", inputSchema: { type: "object", properties: {} } },
 ];
+
+export const cleanSpeech = (t: string) => t.replace(/<thinking>[\s\S]*?(<\/thinking>|$)/gi, "").replace(/<\/?[a-z_]+>/gi, "").replace(/\s+/g, " ").trim();
 
 export type AgentReply = { speech: string; steps: { tool: string; input: any }[]; model: string };
 
@@ -47,7 +52,7 @@ export class Agent {
         messages.push(turn.message);
         const uses = turn.message.content.filter((b): b is Extract<Block, { toolUse: any }> => "toolUse" in b);
         if (turn.stopReason !== "tool_use" || !uses.length) {
-          const speech = turn.message.content.filter((b): b is { text: string } => "text" in b).map((b) => b.text).join(" ").trim() || "Sorry, I didn't catch that.";
+          const speech = cleanSpeech(turn.message.content.filter((b): b is { text: string } => "text" in b).map((b) => b.text).join(" ")) || "Sorry, I didn't catch that.";
           this.memory.update(businessId, { lastSpeech: speech });
           return { speech, steps, model: this.llm.name };
         }
