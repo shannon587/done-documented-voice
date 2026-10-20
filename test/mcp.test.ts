@@ -15,5 +15,5 @@ test("MCP over Streamable HTTP lists and calls tools (protocol 2025-11-25)", asy
   assert.deepEqual(names, ["accessibility_quick_check", "check_business_compliance", "explain_item", "next_deadline"]);
   const r: any = await client.callTool({ name: "next_deadline", arguments: { state: "New Mexico" } });
   assert.match(JSON.parse(r.content[0].text).speech, /no annual report/i);
-  await client.close(); srv.close();
+  await client.close(); srv.closeAllConnections(); srv.close();
 });
