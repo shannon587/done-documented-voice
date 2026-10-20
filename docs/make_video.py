@@ -30,4 +30,4 @@ for r in rows:
     subprocess.run(["ffmpeg","-y","-loglevel","error","-loop","1","-i",f"build/{n}.png","-i",f"build/{n}.mp3","-af","apad=pad_dur=0.6","-c:v","libx264","-tune","stillimage","-pix_fmt","yuv420p","-r","25","-c:a","aac","-ar","44100","-shortest",f"build/{n}.mp4"],check=True)
     parts.append(f"file '{n}.mp4'")
 open("build/list.txt","w").write("\n".join(parts))
-subprocess.run(["ffmpeg","-y","-loglevel","error","-f","concat","-safe","0","-i","build/list.txt","-c","copy","demo_v4.mp4"],check=True)
+subprocess.run(["ffmpeg","-y","-loglevel","error","-f","concat","-safe","0","-i","build/list.txt","-c","copy","demo_v5.mp4"],check=True)
