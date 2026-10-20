@@ -3,3 +3,5 @@ dist
 build
 data/
 .env
+deploy/lambda/out/
+deploy/lambda/function.zip

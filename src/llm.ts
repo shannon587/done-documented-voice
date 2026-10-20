@@ -64,6 +64,7 @@ export class MockLLM implements LLM {
     const patch: any = {};
     if (S) patch.state = S;
     if (/out[- ]of[- ]state|foreign|another state/.test(t)) patch.foreign = true;
+    if (/\b(form|forming|start|starting|open|opening) (a |an |my )?(new )?llc\b|haven.t formed|not formed yet/.test(t)) patch.forming = true;
     if (mi >= 0) patch.anniversaryMonth = mi + 1;
     if (/text|sms/.test(t) && !/what is|what's|explain/.test(t)) patch.textsCustomers = true;
     if (/employee|hire|hiring/.test(t)) patch.hasEmployees = true;
@@ -82,7 +83,7 @@ export class MockLLM implements LLM {
       calls.push(use("next_deadline", { state: S ?? "__profile__", ...(patch.anniversaryMonth ? { anniversaryMonth: patch.anniversaryMonth } : {}) }));
     } else if (/complian|what do i need|get me|checklist|llc|business/.test(t) || S) {
       if (Object.keys(patch).length) calls.push(use("save_business_profile", patch));
-      calls.push(use("check_business_compliance", { state: S ?? "__profile__", ...(patch.foreign ? { foreign: true } : {}) }));
+      calls.push(use("check_business_compliance", { state: S ?? "__profile__", ...(patch.foreign ? { foreign: true } : {}), ...(patch.forming ? { forming: true } : {}) }));
     } else if (Object.keys(patch).length) calls.push(use("save_business_profile", patch));
     if (!calls.length) return { stopReason: "end_turn", message: { role: "assistant", content: [{ text: "You can ask what your business needs, your next deadline, or what a term means." }] } };
     return tool(...calls);

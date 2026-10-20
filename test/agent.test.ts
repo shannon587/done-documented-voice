@@ -32,7 +32,7 @@ test("memory persists across sessions and server restarts", async () => {
   stop(a.srv);
   const b = start(a.memoryFile); // new process, same store
   const n1 = await b.say("next");
-  assert.match(n1.speech, /Item 2 of 3: Registered agent/);
+  assert.match(n1.speech, /Item 2 of 3: Annual report/);
   const d = await b.say("When is my deadline?");
   assert.equal(d.steps[0].input.state, "Idaho");
   assert.equal(d.steps[0].input.anniversaryMonth, 10);
@@ -85,5 +85,22 @@ test("feedback is stored anonymously; MCP is hidden from tunnel traffic", async 
   const { readFileSync } = await import("node:fs");
   assert.equal(JSON.parse(readFileSync(feedbackFile, "utf8").trim()).rating, 5);
   assert.equal((await fetch(base + "/mcp", { method: "POST", headers: { "cf-connecting-ip": "1.2.3.4" } })).status, 404);
+  assert.equal((await fetch(base + "/mcp", { method: "POST", headers: { "x-forwarded-for": "1.2.3.4" } })).status, 404);
   stop(srv);
+});
+
+test("agent: existing Idaho LLC question gets recurring items with a due date, no formation fee", async () => {
+  const { srv, say } = start();
+  const r = await say("What does my Idaho LLC need to file this year?");
+  assert.doesNotMatch(r.speech, /Formation|\$100 online/);
+  assert.match(r.speech, /Annual report/);
+  assert.match(r.speech, /[Dd]ue/);
+  stop(srv);
+});
+
+test("past-tense 'we formed it' never switches to formation; 'start a new LLC' does", async () => {
+  const { saysForming } = await import("../src/agent.js");
+  assert.equal(saysForming("We formed it in March."), false);
+  assert.equal(saysForming("What does my Idaho LLC need to file this year?"), false);
+  assert.equal(saysForming("I want to start a new LLC in Idaho"), true);
 });

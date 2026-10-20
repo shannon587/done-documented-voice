@@ -1,0 +1,3 @@
+{"Version":"2012-10-17","Statement":[
+ {"Effect":"Allow","Action":["bedrock:InvokeModel","bedrock:Converse"],"Resource":["arn:aws:bedrock:*::foundation-model/amazon.nova-lite-v1:0","arn:aws:bedrock:*:ACCOUNT:inference-profile/us.amazon.nova-lite-v1:0"]},
+ {"Effect":"Allow","Action":["dynamodb:PutItem","dynamodb:UpdateItem","dynamodb:Query"],"Resource":"arn:aws:dynamodb:REGION:ACCOUNT:table/dd-voice"}]}

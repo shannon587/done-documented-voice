@@ -2,12 +2,13 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync } from "node:fs";
 import { dirname } from "node:path";
 
-export type ChecklistItem = { item: string; text: string; fee?: string; source: string };
+export type ChecklistItem = { item: string; text: string; fee?: string; source: string; due?: string };
 export type Profile = {
   businessId: string;
   name?: string;
   state?: string;
   foreign?: boolean;
+  forming?: boolean;
   anniversaryMonth?: number;
   hasEmployees?: boolean;
   textsCustomers?: boolean;

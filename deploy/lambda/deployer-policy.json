@@ -1,0 +1,5 @@
+{"Version":"2012-10-17","Statement":[
+ {"Effect":"Allow","Action":["lambda:CreateFunction","lambda:UpdateFunctionCode","lambda:UpdateFunctionConfiguration","lambda:GetFunction","lambda:GetFunctionConfiguration","lambda:CreateFunctionUrlConfig","lambda:GetFunctionUrlConfig","lambda:AddPermission","lambda:GetLayerVersion"],"Resource":"*"},
+ {"Effect":"Allow","Action":["iam:CreateRole","iam:GetRole","iam:AttachRolePolicy","iam:PutRolePolicy","iam:PassRole"],"Resource":"arn:aws:iam::*:role/dd-voice-lambda"},
+ {"Effect":"Allow","Action":["dynamodb:CreateTable","dynamodb:DescribeTable","dynamodb:Query"],"Resource":"arn:aws:dynamodb:*:*:table/dd-voice"},
+ {"Effect":"Allow","Action":["budgets:ViewBudget","budgets:ModifyBudget"],"Resource":"*"}]}

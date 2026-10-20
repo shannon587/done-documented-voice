@@ -10,8 +10,8 @@ const out = (r: object) => ({ content: [{ type: "text" as const, text: JSON.stri
 export function buildServer() {
   const s = new McpServer({ name: "done-documented-voice", version: "0.1.0" });
   s.registerTool("check_business_compliance", {
-    description: "Short, voice-friendly compliance checklist for an LLC in Idaho or New Mexico, with sources.",
-    inputSchema: { state: z.string(), foreign: z.boolean().optional(), hasEmployees: z.boolean().optional(), textsCustomers: z.boolean().optional(), hasWebsite: z.boolean().optional() },
+    description: "Voice-friendly compliance checklist for an LLC in Idaho or New Mexico, with the next due date for each item and sources. Assumes an existing LLC (recurring obligations first) unless forming is true.",
+    inputSchema: { state: z.string(), foreign: z.boolean().optional(), forming: z.boolean().optional(), anniversaryMonth: z.number().int().min(1).max(12).optional(), today: z.string().optional(), hasEmployees: z.boolean().optional(), textsCustomers: z.boolean().optional(), hasWebsite: z.boolean().optional() },
   }, async (a) => out(T.checkCompliance(a)));
   s.registerTool("next_deadline", {
     description: "The next state filing deadline in one sentence.",

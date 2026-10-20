@@ -1,3 +1,4 @@
+import { ensureDue } from "../src/agent.js";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as T from "../src/tools.js";
@@ -29,3 +30,28 @@ test("a11y finds issues", () => {
   assert.equal(T.a11yFromHtml('<html lang=en><h1>x</h1><img alt=""><label for=e>E</label><input id=e></html>').issues.length, 0);
 });
 test("bad URL handled", async () => assert.match((await T.accessibilityQuickCheck({ url: "ftp://x" })).speech, /web address/));
+
+test("existing Idaho LLC: no formation, leads with annual report and its due date", () => {
+  const r = T.checkCompliance({ state: "Idaho", anniversaryMonth: 3, today: "2026-10-20" });
+  assert.ok(!r.items.some((i: any) => i.item === "Formation"));
+  assert.equal(r.items[0].item, "Annual report");
+  assert.match(r.speech, /Due March 31, 2027/);
+  assert.doesNotMatch(r.speech, /\$100 online|Expedite/);
+  for (const i of r.items) assert.ok((i as any).due, `${i.item} has a due`);
+});
+
+test("existing LLC without a known month still says when it's due", () => {
+  const r = T.checkCompliance({ state: "Idaho" });
+  assert.match(r.speech, /Due by the end of your anniversary month/);
+});
+
+test("forming an LLC lists formation first", () => {
+  const r = T.checkCompliance({ state: "Idaho", forming: true });
+  assert.equal(r.items[0].item, "Formation");
+});
+
+test("ensureDue adds a due date and strips formation fees for an existing LLC", () => {
+  const c = T.checkCompliance({ state: "Idaho", anniversaryMonth: 3, today: "2026-10-20" });
+  assert.match(ensureDue("First you need your annual report.", c), /Due March 31, 2027/);
+  assert.equal(ensureDue("First: Formation. Fee: $100 online, $120 paper.", c), c.speech);
+});

@@ -8,19 +8,29 @@ const norm = (s: string) => {
 };
 const unsupported = (s: string) => `I only have verified data for Idaho and New Mexico right now. ${s} is unknown.`;
 
-export function checkCompliance(a: { state: string; foreign?: boolean; hasEmployees?: boolean; textsCustomers?: boolean; hasWebsite?: boolean }) {
+type Item = { item: string; text: string; source: string; fee?: string; due?: string };
+const feeOf = (f?: string) => (f ?? "none").replace(/\.$/, "");
+
+// Existing businesses (the default) hear recurring obligations first, each with its next due date.
+// Formation is only listed when the owner says they are still forming the LLC.
+export function checkCompliance(a: { state: string; foreign?: boolean; forming?: boolean; hasEmployees?: boolean; textsCustomers?: boolean; hasWebsite?: boolean; anniversaryMonth?: number; today?: string }) {
   const st = STATES[norm(a.state)];
   if (!st) return { speech: unsupported(a.state), items: [] };
-  const items = [
-    { item: a.foreign ? "Foreign registration" : "Formation", ...(a.foreign ? st.foreignRegistration : st.formation) },
-    { item: "Registered agent", ...st.registeredAgent },
-    { item: "Annual report", ...st.annualReport },
-  ] as { item: string; text: string; source: string; fee?: string }[];
-  if (a.hasEmployees) items.push({ item: "EIN", ...GENERAL.ein });
-  if (a.textsCustomers) items.push({ item: "SMS consent", ...GENERAL.sms });
-  if (a.hasWebsite) items.push({ item: "Website accessibility", ...GENERAL.ada });
-  const speech = `${st.name}: ${items.length} items. First: ${items[0].item}. Fee: ${(items[0].fee ?? "none").replace(/\.$/, "")}. Say "next" for more.`;
-  return { speech, items, unknowns: st.unknowns };
+  const dl = nextDeadline({ state: a.state, anniversaryMonth: a.anniversaryMonth, today: a.today });
+  const annualDue = !st.annualReport.required ? "No annual report, so no recurring state deadline."
+    : (dl as any).due ? `Due ${dl.speech.match(/due ([^.]+)\./)?.[1]}.` : "Due by the end of your anniversary month. Tell me your formation month for the exact date.";
+  const items: Item[] = [];
+  if (a.forming) items.push({ item: "Formation", ...st.formation, due: "Due before you start doing business." });
+  if (a.foreign) items.push({ item: "Foreign registration", ...st.foreignRegistration, due: "Due before you do business in " + st.name + ". If you've already registered, say done." });
+  if (st.annualReport.required) items.push({ item: "Annual report", text: st.annualReport.text, fee: st.annualReport.fee, source: st.annualReport.source, due: annualDue });
+  items.push({ item: "Registered agent", ...st.registeredAgent, due: "Ongoing. Keep one on file at all times." });
+  if (a.hasEmployees) items.push({ item: "EIN", ...GENERAL.ein, due: "Before your first payroll." });
+  if (a.textsCustomers) items.push({ item: "SMS consent", ...GENERAL.sms, due: "Before you send marketing texts." });
+  if (a.hasWebsite) items.push({ item: "Website accessibility", ...GENERAL.ada, due: "Ongoing." });
+  if (!st.annualReport.required && !a.forming) items.push({ item: "No annual report", text: st.annualReport.text, fee: st.annualReport.fee, source: st.annualReport.source, due: annualDue });
+  const first = items[0];
+  const speech = `${st.name}: ${items.length} items. First: ${first.item}. ${first.due} Fee: ${feeOf(first.fee).replace(/\s*\([^)]*\)/g, "")}.${items.length > 1 ? ' Say "next" for more.' : ""}`;
+  return { speech, items, dueSpeech: dl.speech, ...((dl as any).due ? { nextDue: (dl as any).due } : {}), unknowns: st.unknowns };
 }
 
 export function nextDeadline(a: { state: string; anniversaryMonth?: number; today?: string }) {
