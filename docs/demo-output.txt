@@ -1,0 +1,11 @@
+Tools: check_business_compliance, next_deadline, explain_item, accessibility_quick_check
+> check_business_compliance {"state":"Idaho","foreign":true,"textsCustomers":true}
+  "Idaho: 4 items. First: Foreign registration. Fee: $100 online, $120 paper. Say "next" for more."
+> next_deadline {"state":"Idaho","anniversaryMonth":10,"today":"2026-10-20"}
+  "Next: Idaho annual report, due October 31, 2026. Free online."
+> next_deadline {"state":"New Mexico"}
+  "New Mexico LLCs have no annual report. No recurring state deadline."
+> explain_item {"item":"registered agent"}
+  "The person or company that accepts legal papers for your business. They need a real street address in that state."
+> check_business_compliance {"state":"Texas"}
+  "I only have verified data for Idaho and New Mexico right now. Texas is unknown."
