@@ -104,3 +104,39 @@ test("past-tense 'we formed it' never switches to formation; 'start a new LLC' d
   assert.equal(saysForming("What does my Idaho LLC need to file this year?"), false);
   assert.equal(saysForming("I want to start a new LLC in Idaho"), true);
 });
+
+test("formation month in the first question gives the exact annual report date", async () => {
+  const { formationMonth } = await import("../src/agent.js");
+  assert.equal(formationMonth("Idaho LLC formed in March 2024"), 3);
+  assert.equal(formationMonth("we registered it back in Sept 2023"), 9);
+  assert.equal(formationMonth("What does my Idaho LLC need to file this year?"), undefined);
+  const { srv, say } = start();
+  const r = await say("What does my Idaho LLC need to file this year? It was formed in March 2024.");
+  assert.match(r.speech, /March 31, 2027/);
+  assert.doesNotMatch(r.speech, /formation month/);
+  stop(srv);
+});
+
+test("profile kept on the phone restores memory on a fresh server (Lambda cold start)", async () => {
+  const a = start();
+  const first = await a.say("What does my Idaho LLC need to file this year? It was formed in March 2024.", "t-phone");
+  assert.equal(first.profile.anniversaryMonth, 3);
+  stop(a.srv);
+  const b = start(); // brand-new store, like a new Lambda container
+  const post = (body: any) => fetch(b.base + "/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json() as Promise<any>);
+  const n = await post({ text: "next", businessId: "t-phone", profile: first.profile });
+  assert.match(n.speech, /Item 2 of 2: Registered agent/);
+  const bad = await post({ text: "next", businessId: "t-evil", profile: { state: 5, anniversaryMonth: 99, checklist: "x", extra: "<script>" } });
+  assert.match(bad.speech, /no checklist/i);
+  assert.equal(bad.profile.anniversaryMonth, undefined);
+  assert.equal(bad.profile.extra, undefined);
+  stop(b.srv);
+});
+
+test("'next' works even when only the deadline was given (no checklist yet)", async () => {
+  const b = start();
+  const r = await fetch(b.base + "/api/chat", { method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ text: "next", businessId: "t-x", profile: { state: "Idaho", anniversaryMonth: 3 } }) }).then((x) => x.json() as Promise<any>);
+  assert.match(r.speech, /Item 2 of 2: Registered agent/);
+  stop(b.srv);
+});

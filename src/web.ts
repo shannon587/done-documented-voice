@@ -37,7 +37,8 @@ export function buildWebApp(opts: { guard?: GuardOpts; feedbackFile?: string; ll
     if (ddbEnabled() && (await bumpDaily(new Date().toISOString().slice(0, 10))) > DAILY_CAP)
       return res.status(429).json({ speech: "The demo has reached its limit for today. Please try again tomorrow." });
     agent ??= new Agent(llm, opts.mcpUrl?.() ?? new URL(`http://127.0.0.1:${(req.socket.localPort)}/mcp`), memory, opts.today);
-    try { res.json(await agent.chat(businessId, text)); }
+    memory.seed(businessId, req.body?.profile);
+    try { const r = await agent.chat(businessId, text); res.json({ ...r, profile: memory.get(businessId) }); }
     catch (e: any) { console.error(e); res.status(500).json({ speech: "Something went wrong on my end. Please try again.", error: String(e?.name ?? e) }); }
   });
   app.post("/api/feedback", async (req, res) => {

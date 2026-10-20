@@ -89,8 +89,9 @@ async function ask(text) {
   reply.textContent = "Thinking…";
   try {
     const r = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text, businessId: dev }) });
+      body: JSON.stringify({ text, businessId: dev, profile: JSON.parse(localStorage.getItem("dd-profile") || "null") }) });
     const j = await r.json();
+    if (j.profile) localStorage.setItem("dd-profile", JSON.stringify(j.profile));
     reply.textContent = j.speech; say(j.speech);
   } catch { reply.textContent = "I couldn't reach the server. Please try again."; say(reply.textContent); }
 }

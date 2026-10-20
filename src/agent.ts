@@ -3,6 +3,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { LLM, Message, ToolSpec, Block } from "./llm.js";
+import { checkCompliance } from "./tools.js";
 import { MemoryStore, type Profile } from "./memory.js";
 
 const MAX_STEPS = 6;
@@ -41,12 +42,21 @@ export function ensureDue(speech: string, c?: { items: { item: string; due?: str
   if (!c?.items?.length) return speech;
   const hasFormation = c.items.some((i) => i.item === "Formation");
   if (!hasFormation && /formation|certificate of organization|\$100 online, \$120 paper|expedite/i.test(speech) && !/foreign/i.test(speech)) speech = c.speech ?? speech;
-  if (/\bdue\b|deadline|no recurring|anniversary month|ongoing|at all times/i.test(speech)) return speech;
+  if (/\bdue\b|deadline|no recurring|anniversary month|ongoing|at all times|before you start|\b(january|february|march|april|may|june|july|august|september|october|november|december) \d{1,2}/i.test(speech)) return speech;
   return `${speech} ${c.items[0].due ?? c.dueSpeech ?? ""}`.trim();
 }
 
 // The model sometimes reads "we formed it in March" as forming. Only trust forming when the owner clearly says so.
 export const saysForming = (t: string) => /\b(start|starting|form|forming|open|opening|create|creating|set up|setting up|register|registering) (a |an |my |our )?(new )?(llc|business|company)\b|haven'?t formed|not formed yet|before (i|we) form/i.test(t);
+
+const MONTHS = ["january","february","march","april","may","june","july","august","september","october","november","december"];
+// Pull the formation month straight from the owner's words ("formed in March 2024") so we never ask again.
+export function formationMonth(t: string): number | undefined {
+  const m = t.toLowerCase().match(/\b(formed|registered|organized|incorporated|created|started|filed|set up|opened|since|anniversary)\b[^.?!]{0,40}?\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept?|oct|nov|dec)\b/);
+  if (!m) return undefined;
+  const i = MONTHS.findIndex((x) => x.startsWith(m[2]));
+  return i >= 0 ? i + 1 : undefined;
+}
 
 export type AgentReply = { speech: string; steps: { tool: string; input: any }[]; model: string };
 
@@ -56,6 +66,8 @@ export class Agent {
   private lastText = "";
   async chat(businessId: string, userText: string): Promise<AgentReply> {
     this.lastText = userText;
+    const fm = formationMonth(userText);
+    if (fm && !saysForming(userText)) this.memory.update(businessId, { anniversaryMonth: fm });
     // "next" and "repeat" are navigation, not questions: handle them directly so the model can't restart the list.
     const nav = userText.trim().toLowerCase().replace(/[.!?]/g, "");
     const navTool = /^(next|next one|go on|continue|what else)$/.test(nav) ? "next_checklist_item" : /^(repeat|say that again|say it again|again)$/.test(nav) ? "repeat_last" : undefined;
@@ -153,9 +165,14 @@ export class Agent {
       case "repeat_last": return { speech: p.lastSpeech ?? "Nothing to repeat yet." };
       case "forget_business": m.forget(id); return { speech: "Okay, I've forgotten this business." };
       case "next_checklist_item": {
-        const list = p.checklist ?? [];
+        let list = p.checklist ?? []; let cur = p.cursor ?? 0;
+        if (!list.length && p.state) {
+          // The model answered with a deadline only; build the checklist now so "next" always works.
+          list = checkCompliance({ state: p.state, foreign: p.foreign, forming: p.forming, hasEmployees: p.hasEmployees, textsCustomers: p.textsCustomers, hasWebsite: !!p.website, anniversaryMonth: p.anniversaryMonth, today: this.today() }).items as any;
+          cur = 0; if (list.length) m.update(id, { checklist: list, cursor: 0 });
+        }
         if (!list.length) return { speech: "There's no checklist yet. Ask what your business needs first." };
-        const i = (p.cursor ?? 0) + 1;
+        const i = cur + 1;
         if (i >= list.length) return { speech: "That's the whole checklist. Nice work." };
         m.update(id, { cursor: i }); const it = list[i];
         return { speech: `Item ${i + 1} of ${list.length}: ${it.item}. ${it.text}${(it as any).due ? " " + (it as any).due : ""}${it.fee ? " Fee: " + it.fee : ""}${i + 1 < list.length ? " Say next for more." : ""}`, source: it.source };

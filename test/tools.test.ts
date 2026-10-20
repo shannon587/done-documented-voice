@@ -55,3 +55,8 @@ test("ensureDue adds a due date and strips formation fees for an existing LLC", 
   assert.match(ensureDue("First you need your annual report.", c), /Due March 31, 2027/);
   assert.equal(ensureDue("First: Formation. Fee: $100 online, $120 paper.", c), c.speech);
 });
+
+test("ensureDue does not repeat a date the model already said", () => {
+  const c = T.checkCompliance({ state: "Idaho", anniversaryMonth: 3, today: "2026-10-20" });
+  assert.equal(ensureDue("File your annual report by March 31, 2027.", c), "File your annual report by March 31, 2027.");
+});
