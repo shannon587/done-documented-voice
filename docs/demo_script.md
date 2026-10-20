@@ -1,6 +1,6 @@
 # Demo video script (about 2 minutes, under 3)
 
-Voice: en-US-AvaMultilingualNeural (edge-tts). On screen the brand is always "Done + Documented"; the narration says "Done and Documented".
+Voice: en-US-JennyNeural (edge-tts). On screen the brand is always "Done + Documented"; the narration says "Done and Documented".
 
 | # | Screen | Narration |
 |---|---|---|

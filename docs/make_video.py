@@ -2,7 +2,7 @@
 import re, subprocess, os, textwrap, asyncio
 from PIL import Image, ImageDraw, ImageFont
 import edge_tts
-VOICE = "en-US-AvaMultilingualNeural"
+VOICE = "en-US-JennyNeural"
 # Spoken-only name spelling (slides keep "Shannon Watson"). Tested name_test_1..3; plain spelling scored best.
 NAME_SAY = "Shannon Watson"
 rows = [l for l in open("docs/demo_script.md") if re.match(r"\| \d", l)]
@@ -30,4 +30,4 @@ for r in rows:
     subprocess.run(["ffmpeg","-y","-loglevel","error","-loop","1","-i",f"build/{n}.png","-i",f"build/{n}.mp3","-af","apad=pad_dur=0.6","-c:v","libx264","-tune","stillimage","-pix_fmt","yuv420p","-r","25","-c:a","aac","-ar","44100","-shortest",f"build/{n}.mp4"],check=True)
     parts.append(f"file '{n}.mp4'")
 open("build/list.txt","w").write("\n".join(parts))
-subprocess.run(["ffmpeg","-y","-loglevel","error","-f","concat","-safe","0","-i","build/list.txt","-c","copy","demo_v3.mp4"],check=True)
+subprocess.run(["ffmpeg","-y","-loglevel","error","-f","concat","-safe","0","-i","build/list.txt","-c","copy","demo_v4.mp4"],check=True)
