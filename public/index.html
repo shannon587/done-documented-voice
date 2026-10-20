@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Done + Documented Voice</title>
+<title>Done + Documented Voice Assistant</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
   body { margin: 0; background: #000; color: #fff; font: 600 1.6rem/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
   main { max-width: 52rem; margin: 0 auto; padding: 1.5rem; }
-  h1 { color: #ffd34d; font-size: 2.4rem; margin: .2rem 0 1rem; }
+  h1 { color: #ffd34d; font-size: 2.6rem; margin: .2rem 0 1rem; }
   #talk { display: block; width: 100%; min-height: 9rem; font: 800 2.4rem system-ui, sans-serif; color: #000; background: #ffd34d;
           border: .4rem solid #fff; border-radius: 1.5rem; cursor: pointer; touch-action: none; }
   #talk[aria-pressed="true"] { background: #7CFFB2; }
@@ -22,16 +22,24 @@
   input { flex: 1; font: 600 1.5rem system-ui, sans-serif; padding: .7rem; background: #111; color: #fff; border: .2rem solid #fff; border-radius: .8rem; }
   label { display: block; margin-top: 1.2rem; }
   small { font-size: 1.1rem; color: #ddd; }
+  textarea { width: 100%; font: 600 1.4rem system-ui, sans-serif; padding: .7rem; background: #111; color: #fff; border: .2rem solid #fff; border-radius: .8rem; }
+  details { margin-top: 2rem; border-top: .15rem solid #666; padding-top: 1rem; }
+  summary { cursor: pointer; color: #ffd34d; padding: .5rem 0; }
+  fieldset { border: .15rem solid #666; border-radius: .8rem; margin-top: 1rem; }
+  input[type=radio], input[type=checkbox] { width: 2rem; height: 2rem; flex: none; vertical-align: middle; }
+  #fb label { margin-top: .8rem; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 </style>
 </head>
 <body>
 <main>
-  <h1>Done + Documented Voice</h1>
-  <button id="talk" aria-pressed="false" aria-describedby="hint">Hold to talk</button>
-  <p id="hint"><small>Hold the button, or press the space bar, and speak. Let go to send. Try: "Get me compliant in Idaho. We're an out-of-state LLC."</small></p>
+  <h1>Done + Documented</h1>
+  <p id="intro">Your voice assistant for small business paperwork. Ask what your business needs to file, and when. Built by founder Shannon Watson.</p>
+  <button id="talk" type="button" aria-pressed="false" aria-describedby="hint">Tap to talk</button>
+  <p id="hint"><small>Tap once and speak. Tap again when you're done, or just stop talking. Try: "What does my Idaho LLC need to file this year?"</small></p>
   <p id="heard" aria-live="polite"></p>
-  <div id="reply" role="status" aria-live="assertive" aria-atomic="true">Hi. Ask what your business needs.</div>
+  <h2 class="sr">Reply</h2>
+  <div id="reply" role="status" aria-live="assertive" aria-atomic="true">Hi. Tap the big button and ask what your business needs.</div>
   <div class="row">
     <button type="button" data-say="next">Next</button>
     <button type="button" data-say="repeat">Repeat</button>
@@ -39,28 +47,41 @@
   </div>
   <form id="typed">
     <label class="sr" for="q">Type a question</label>
-    <input id="q" autocomplete="off" placeholder="Or type a question">
+    <input id="q" autocomplete="off" placeholder="Or type a question" enterkeyhint="send">
     <button>Send</button>
   </form>
-  <label for="biz"><small>Business name (remembered on this device)</small></label>
-  <input id="biz" autocomplete="organization">
-  <p><small id="mode"></small> <small>Information only, not legal advice.</small></p>
+  <details id="fbbox">
+    <summary>Give feedback (optional, anonymous)</summary>
+    <form id="fb">
+      <fieldset><legend>How useful was it?</legend>
+        <div class="row" role="radiogroup">
+          <label><input type="radio" name="r" value="1"> 1</label><label><input type="radio" name="r" value="2"> 2</label><label><input type="radio" name="r" value="3"> 3</label><label><input type="radio" name="r" value="4"> 4</label><label><input type="radio" name="r" value="5"> 5 best</label>
+        </div></fieldset>
+      <label><input type="checkbox" id="sr"> I use a screen reader or magnifier</label>
+      <label for="fbt">What worked, and what got in your way?</label>
+      <textarea id="fbt" rows="4" maxlength="2000"></textarea>
+      <div class="row"><button type="button" id="fbmic">Speak feedback</button><button>Send feedback</button></div>
+      <p><small>No name or email is collected. Your words may be quoted anonymously to describe this project.</small></p>
+    </form>
+  </details>
+  <p><small>Information only, not legal advice. This is a free test version and has a daily limit.</small></p>
 </main>
 <script>
 const $ = (s) => document.querySelector(s);
-const talk = $("#talk"), reply = $("#reply"), heard = $("#heard"), biz = $("#biz");
-biz.value = localStorage.getItem("dd-biz") || "my-business";
-biz.onchange = () => localStorage.setItem("dd-biz", biz.value.trim() || "my-business");
-fetch("/api/mode").then(r => r.json()).then(m => $("#mode").textContent = "Model: " + m.model + ".");
+const talk = $("#talk"), reply = $("#reply"), heard = $("#heard");
+let dev = localStorage.getItem("dd-dev");
+if (!dev) { dev = "t-" + (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2)); localStorage.setItem("dd-dev", dev); }
 
 function pickVoice() {
-  const v = speechSynthesis.getVoices().filter(v => v.lang === "en-US");
-  return v.find(v => /natural|neural|jenny|aria|samantha|google us/i.test(v.name)) || v[0];
+  const v = speechSynthesis.getVoices().filter(v => /^en[-_]US/i.test(v.lang));
+  return v.find(v => /natural|neural|jenny|aria|ava|samantha|google us/i.test(v.name)) || v[0];
 }
+speechSynthesis.onvoiceschanged = () => {};
 function say(text) {
+  if (!("speechSynthesis" in window)) return;
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
-  u.voice = pickVoice() || null; u.rate = 0.95; u.lang = "en-US";
+  u.voice = pickVoice() || null; u.rate = 1; u.lang = "en-US";
   speechSynthesis.speak(u);
 }
 async function ask(text) {
@@ -68,41 +89,37 @@ async function ask(text) {
   reply.textContent = "Thinking…";
   try {
     const r = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text, businessId: (biz.value.trim() || "my-business").toLowerCase().replace(/\s+/g, "-") }) });
+      body: JSON.stringify({ text, businessId: dev }) });
     const j = await r.json();
     reply.textContent = j.speech; say(j.speech);
-  } catch { reply.textContent = "I couldn't reach the server."; say(reply.textContent); }
+  } catch { reply.textContent = "I couldn't reach the server. Please try again."; say(reply.textContent); }
 }
 
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let rec, finalText = "", listening = false;
-function start() {
-  if (listening) return;
-  if (!SR) { reply.textContent = "Voice input isn't supported in this browser. Please type below, or use Chrome or Edge."; say(reply.textContent); $("#q").focus(); return; }
-  speechSynthesis.cancel();
-  rec = new SR(); rec.lang = "en-US"; rec.interimResults = true; rec.continuous = true; finalText = "";
+let rec = null, finalText = "", target = null;
+function listen(onDone, btn, idleLabel) {
+  if (rec) { rec.stop(); return; }
+  if (!SR) { reply.textContent = "Voice input isn't available in this browser. Please type instead."; say(reply.textContent); $("#q").focus(); return; }
+  speechSynthesis.cancel(); finalText = "";
+  rec = new SR(); rec.lang = "en-US"; rec.interimResults = true; rec.continuous = false;
   rec.onresult = (e) => { let t = ""; for (const r of e.results) t += r[0].transcript; finalText = t; heard.textContent = t; };
-  rec.onend = () => { if (listening) stop(); };
-  rec.start(); listening = true;
-  talk.setAttribute("aria-pressed", "true"); talk.textContent = "Listening… let go to send";
+  rec.onerror = (e) => { heard.textContent = e.error === "not-allowed" ? "Microphone permission was blocked. You can type instead." : "I didn't catch that."; };
+  rec.onend = () => { rec = null; btn.setAttribute("aria-pressed", "false"); btn.textContent = idleLabel; if (finalText.trim()) onDone(finalText.trim()); };
+  rec.start(); btn.setAttribute("aria-pressed", "true"); btn.textContent = "Listening… tap to finish";
 }
-function stop() {
-  if (!listening) return;
-  listening = false; talk.setAttribute("aria-pressed", "false"); talk.textContent = "Hold to talk";
-  try { rec.stop(); } catch {}
-  setTimeout(() => { if (finalText.trim()) ask(finalText.trim()); else heard.textContent = "I didn't hear anything."; }, 300);
-}
-talk.addEventListener("pointerdown", (e) => { e.preventDefault(); start(); });
-talk.addEventListener("pointerup", stop);
-talk.addEventListener("pointerleave", stop);
-talk.addEventListener("keydown", (e) => { if ((e.key === " " || e.key === "Enter") && !e.repeat) { e.preventDefault(); start(); } });
-talk.addEventListener("keyup", (e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); stop(); } });
-document.addEventListener("keydown", (e) => { if (e.key === " " && e.target === document.body && !e.repeat) { e.preventDefault(); talk.focus(); start(); } });
-document.addEventListener("keyup", (e) => { if (e.key === " " && listening) stop(); });
+talk.onclick = () => listen(ask, talk, "Tap to talk");
+$("#fbmic").onclick = (e) => listen((t) => { $("#fbt").value = ($("#fbt").value + " " + t).trim(); }, e.currentTarget, "Speak feedback");
 document.querySelectorAll("[data-say]").forEach(b => b.onclick = () => ask(b.dataset.say));
 $("#stop").onclick = () => speechSynthesis.cancel();
 $("#typed").onsubmit = (e) => { e.preventDefault(); const q = $("#q").value.trim(); if (q) { ask(q); $("#q").value = ""; } };
-talk.focus();
+$("#fb").onsubmit = async (e) => {
+  e.preventDefault();
+  const r = document.querySelector("input[name=r]:checked");
+  const res = await fetch("/api/feedback", { method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ text: $("#fbt").value, rating: r ? Number(r.value) : undefined, usesScreenReader: $("#sr").checked, device: /iPhone|iPad/.test(navigator.userAgent) ? "ios" : /Android/.test(navigator.userAgent) ? "android" : "other" }) }).then(x => x.json()).catch(() => ({ speech: "Sorry, feedback couldn't be sent." }));
+  reply.textContent = res.speech; say(res.speech);
+  if (res.ok) { $("#fbt").value = ""; }
+};
 </script>
 </body>
 </html>

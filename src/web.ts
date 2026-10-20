@@ -6,11 +6,20 @@ import { buildApp } from "./server.js";
 import { Agent } from "./agent.js";
 import { pickLLM, type LLM } from "./llm.js";
 import { MemoryStore } from "./memory.js";
+import { Guard, DEFAULT_GUARD, type GuardOpts } from "./guard.js";
+import { appendFileSync, mkdirSync } from "node:fs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-export function buildWebApp(opts: { llm?: LLM; memoryFile?: string; mcpUrl?: () => URL; today?: () => string } = {}) {
+export function buildWebApp(opts: { guard?: GuardOpts; feedbackFile?: string; llm?: LLM; memoryFile?: string; mcpUrl?: () => URL; today?: () => string } = {}) {
   const app = buildApp();
+  const guard = new Guard(opts.guard ?? DEFAULT_GUARD);
+  const feedbackFile = opts.feedbackFile ?? process.env.FEEDBACK_FILE ?? join(root, "data", "feedback.jsonl");
+  // Behind the tunnel the real client IP arrives in cf-connecting-ip. The MCP endpoint stays private to the agent.
+  const ipOf = (req: any) => String(req.headers["cf-connecting-ip"] ?? req.socket.remoteAddress ?? "?");
+  const outer = express();
+  outer.use(["/mcp", "/api/profile"], (req, res, next) => (req.headers["cf-connecting-ip"] ? res.status(404).end() : next()));
+  outer.use(app);
   const memory = new MemoryStore(opts.memoryFile ?? process.env.MEMORY_FILE ?? join(root, "data", "memory.json"));
   const llm = opts.llm ?? pickLLM();
   let agent: Agent | undefined;
@@ -18,18 +27,32 @@ export function buildWebApp(opts: { llm?: LLM; memoryFile?: string; mcpUrl?: () 
     const text = String(req.body?.text ?? "").slice(0, 500).trim();
     const businessId = String(req.body?.businessId ?? "default").replace(/[^\w-]/g, "").slice(0, 64) || "default";
     if (!text) return res.status(400).json({ speech: "I didn't hear anything." });
+    const g = guard.check(ipOf(req));
+    if (!g.ok) return res.status(429).json({ speech: g.speech });
     agent ??= new Agent(llm, opts.mcpUrl?.() ?? new URL(`http://127.0.0.1:${(req.socket.localPort)}/mcp`), memory, opts.today);
     try { res.json(await agent.chat(businessId, text)); }
     catch (e: any) { console.error(e); res.status(500).json({ speech: "Something went wrong on my end. Please try again.", error: String(e?.name ?? e) }); }
   });
+  app.post("/api/feedback", (req, res) => {
+    const b = req.body ?? {};
+    const text = String(b.text ?? "").slice(0, 2000).trim();
+    if (!text) return res.status(400).json({ ok: false, speech: "Please say or type your feedback first." });
+    const g = guard.check("fb:" + ipOf(req));
+    if (!g.ok) return res.status(429).json({ ok: false, speech: g.speech });
+    const rating = Number.isInteger(b.rating) && b.rating >= 1 && b.rating <= 5 ? b.rating : undefined;
+    const entry = { at: new Date().toISOString(), rating, text, usesScreenReader: b.usesScreenReader === true ? true : undefined, device: String(b.device ?? "").slice(0, 40) || undefined };
+    mkdirSync(dirname(feedbackFile), { recursive: true });
+    appendFileSync(feedbackFile, JSON.stringify(entry) + "\n");
+    res.json({ ok: true, speech: "Thank you. Your feedback was saved anonymously." });
+  });
   app.get("/api/profile/:id", (req, res) => res.json(memory.get(req.params.id)));
-  app.get("/api/mode", (_q, r) => r.json({ model: llm.name }));
+  app.get("/api/mode", (_q, r) => r.json({ model: llm.name, usage: guard.stats() }));
   app.use(express.static(join(root, "public")));
-  return app;
+  return outer;
 }
 
 if (process.argv[1]?.endsWith("web.ts") || process.argv[1]?.endsWith("web.js")) {
   const port = Number(process.env.PORT ?? 3000);
   const app = buildWebApp();
-  app.listen(port, () => console.log(`Done + Documented Voice: http://localhost:${port}  (MCP at /mcp, model ${pickLLM().name})`));
+  app.listen(port, process.env.HOST ?? "127.0.0.1", () => console.log(`Done + Documented Voice: http://localhost:${port}  (MCP at /mcp, model ${pickLLM().name})`));
 }

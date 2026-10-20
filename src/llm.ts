@@ -24,7 +24,7 @@ export class BedrockLLM implements LLM {
       system: [{ text: system }],
       messages: messages as any,
       toolConfig: { tools: tools.map((t) => ({ toolSpec: { name: t.name, description: t.description, inputSchema: { json: t.inputSchema } } })) },
-      inferenceConfig: { maxTokens: 400, temperature: 0.3 },
+      inferenceConfig: { maxTokens: Number(process.env.MAX_TOKENS ?? 300), temperature: 0.3 },
     }));
     return { stopReason: r.stopReason, message: r.output.message, usage: r.usage };
   }

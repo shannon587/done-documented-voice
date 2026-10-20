@@ -66,3 +66,24 @@ test("memory store forget", () => {
   m.update("a", { state: "Idaho" }); assert.equal(m.get("a").state, "Idaho");
   m.forget("a"); assert.equal(m.get("a").state, undefined);
 });
+
+test("cost guard: per-IP rate limit returns 429 with spoken message", async () => {
+  const srv = buildWebApp({ llm: new MockLLM(), memoryFile: join(mkdtempSync(join(tmpdir(), "dd-")), "m.json"), guard: { perIpPerMinute: 2, perIpPerDay: 100, globalPerDay: 100 } }).listen(0);
+  const base = `http://127.0.0.1:${(srv.address() as any).port}`;
+  const post = () => fetch(base + "/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: "hi" }) });
+  assert.equal((await post()).status, 200); assert.equal((await post()).status, 200);
+  const r = await post(); assert.equal(r.status, 429); assert.match((await r.json()).speech, /wait a minute/);
+  stop(srv);
+});
+
+test("feedback is stored anonymously; MCP is hidden from tunnel traffic", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "dd-")); const feedbackFile = join(dir, "fb.jsonl");
+  const srv = buildWebApp({ llm: new MockLLM(), memoryFile: join(dir, "m.json"), feedbackFile }).listen(0);
+  const base = `http://127.0.0.1:${(srv.address() as any).port}`;
+  const r = await (await fetch(base + "/api/feedback", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: "Easy to use", rating: 5 }) })).json();
+  assert.equal(r.ok, true);
+  const { readFileSync } = await import("node:fs");
+  assert.equal(JSON.parse(readFileSync(feedbackFile, "utf8").trim()).rating, 5);
+  assert.equal((await fetch(base + "/mcp", { method: "POST", headers: { "cf-connecting-ip": "1.2.3.4" } })).status, 404);
+  stop(srv);
+});
