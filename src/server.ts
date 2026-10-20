@@ -45,5 +45,5 @@ export function buildApp() {
 
 if (process.argv[1]?.endsWith("server.ts") || process.argv[1]?.endsWith("server.js")) {
   const port = Number(process.env.PORT ?? 3000);
-  buildApp().listen(port, () => console.log(`Done Documented Voice MCP on http://localhost:${port}/mcp (protocol ${LATEST_PROTOCOL_VERSION})`));
+  buildApp().listen(port, () => console.log(`Done + Documented Voice MCP on http://localhost:${port}/mcp (protocol ${LATEST_PROTOCOL_VERSION})`));
 }

@@ -1,11 +1,11 @@
-# Done Documented Voice
+# Done + Documented Voice
 
 **A voice-first compliance assistant for small businesses, built as a self-hosted MCP server for Alexa+.**
 
 ## Why it exists
 Shannon Watson is a legally blind founder who runs small businesses in Idaho and New Mexico. State compliance sites are walls of dense text and PDFs, and screen readers make them slower still. She works voice-first and needs one short answer at a time: what is due, what does it cost, and what does this word mean.
 
-Done Documented Voice gives those answers through the Model Context Protocol (MCP), the open standard behind Alexa+ integrations. Any MCP-capable assistant can ask it a question and speak the reply.
+Done + Documented Voice gives those answers through the Model Context Protocol (MCP), the open standard behind Alexa+ integrations. Any MCP-capable assistant can ask it a question and speak the reply.
 
 ## Design rules
 - Every reply has a `speech` field short enough to say out loud. Details come one at a time ("Say next for more").
