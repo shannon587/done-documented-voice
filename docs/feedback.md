@@ -1,8 +1,13 @@
 # Product feedback (draft)
 
-**Tools used:** MCP TypeScript SDK 1.32.1 (McpServer, StreamableHTTPServerTransport, and the client for tests), plus MCP Inspector. No AWS services.
+**Tools used:**
+- MCP TypeScript SDK 1.32.1: McpServer and StreamableHTTPServerTransport for the server, and Client with StreamableHTTPClientTransport for the agent and tests
+- MCP Inspector
+- **Amazon Bedrock Runtime (Converse API with tool use)** through `@aws-sdk/client-bedrock-runtime`, with Amazon Nova Lite as the default model
 
-**What it was used for:** a self-hosted, stateless Streamable HTTP MCP server with four voice-oriented tools for the Alexa+ track.
+**What it was used for:** a self-hosted, stateless Streamable HTTP MCP server with four voice-oriented tools for the Alexa+ track, and a Bedrock-powered agent. The agent discovers those tools over MCP, plans multi-step goals with Converse tool use, and keeps per-business memory, all behind a push-to-talk web page that simulates an Alexa+ experience.
+
+**AWS services:** Amazon Bedrock Converse (tool use) is the agent's planner. The `toolUse` and `toolResult` blocks map one-to-one onto MCP `tools/call`. Nova Lite through the `us.` inference profile keeps each spoken turn at a fraction of a cent.
 
 **What worked well:**
 - `registerTool` with zod schemas is concise.
