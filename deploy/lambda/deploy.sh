@@ -9,11 +9,12 @@ FN=dd-voice; ROLE=dd-voice-lambda; TABLE=dd-voice; EMAIL=${BUDGET_EMAIL:?set BUD
 LAYER=arn:aws:lambda:$R:753240598075:layer:LambdaAdapterLayerX86:25
 cd "$(dirname "$0")"; ./build.sh
 
-aws dynamodb describe-table --table-name $TABLE --region $R >/dev/null 2>&1 || \
+USE_DDB=${USE_DDB:-1}
+[ "$USE_DDB" = 1 ] && { aws dynamodb describe-table --table-name $TABLE --region $R >/dev/null 2>&1 || \
   aws dynamodb create-table --table-name $TABLE --region $R --billing-mode PROVISIONED \
     --provisioned-throughput ReadCapacityUnits=2,WriteCapacityUnits=2 \
     --attribute-definitions AttributeName=pk,AttributeType=S AttributeName=sk,AttributeType=S \
-    --key-schema AttributeName=pk,KeyType=HASH AttributeName=sk,KeyType=RANGE >/dev/null
+    --key-schema AttributeName=pk,KeyType=HASH AttributeName=sk,KeyType=RANGE >/dev/null; }
 
 if ! aws iam get-role --role-name $ROLE >/dev/null 2>&1; then
   aws iam create-role --role-name $ROLE --assume-role-policy-document file://trust.json >/dev/null
@@ -22,7 +23,8 @@ if ! aws iam get-role --role-name $ROLE >/dev/null 2>&1; then
   aws iam put-role-policy --role-name $ROLE --policy-name dd-voice-runtime --policy-document file:///tmp/rp.json
   sleep 10
 fi
-ENV="Variables={AWS_LWA_PORT=8080,PORT=8080,MEMORY_FILE=/tmp/memory.json,DDB_TABLE=$TABLE,DAILY_CAP=1500,RATE_PER_MIN=8,RATE_PER_IP_DAY=120,MAX_TOKENS=300,LLM_MODE=bedrock,AWS_LAMBDA_EXEC_WRAPPER=/opt/bootstrap}"
+DDBV=""; [ "$USE_DDB" = 1 ] && DDBV="DDB_TABLE=$TABLE,"
+ENV="Variables={AWS_LWA_PORT=8080,PORT=8080,MEMORY_FILE=/tmp/memory.json,${DDBV}FEEDBACK_LOG=1,DAILY_CAP=1500,RATE_PER_MIN=8,RATE_PER_IP_DAY=120,MAX_TOKENS=300,LLM_MODE=bedrock,AWS_LAMBDA_EXEC_WRAPPER=/opt/bootstrap}"
 if aws lambda get-function --function-name $FN --region $R >/dev/null 2>&1; then
   aws lambda update-function-code --function-name $FN --zip-file fileb://function.zip --region $R >/dev/null
 else
@@ -30,10 +32,14 @@ else
     --role arn:aws:iam::$ACCT:role/$ROLE --handler run.sh --zip-file fileb://function.zip \
     --timeout 30 --memory-size 512 --layers $LAYER --environment "$ENV" >/dev/null
   aws lambda wait function-active --function-name $FN --region $R
+  # Without DynamoDB, one warm container keeps the in-memory daily cap meaningful.
+  [ "$USE_DDB" = 1 ] || aws lambda put-function-concurrency --function-name $FN --region $R --reserved-concurrent-executions 1 >/dev/null 2>&1 || echo "reserved concurrency not allowed on this account"
   aws lambda create-function-url-config --function-name $FN --region $R --auth-type NONE >/dev/null
   aws lambda add-permission --function-name $FN --region $R --statement-id public-url \
     --action lambda:InvokeFunctionUrl --principal '*' --function-url-auth-type NONE >/dev/null
+  aws lambda add-permission --function-name $FN --region $R --statement-id public-invoke \
+    --action lambda:InvokeFunction --principal "*" --invoked-via-function-url >/dev/null
 fi
-sed "s/EMAIL/$EMAIL/g" budget-notify.json > /tmp/bn.json
-aws budgets create-budget --account-id $ACCT --budget file://budget.json --notifications-with-subscribers file:///tmp/bn.json 2>/dev/null || echo "budget exists"
+sed "s/__EMAIL__/$EMAIL/g" budget-notify.json > /tmp/bn.json
+aws budgets create-budget --account-id $ACCT --budget file://budget.json --notifications-with-subscribers file:///tmp/bn.json 2>&1 | tail -1 || true
 aws lambda get-function-url-config --function-name $FN --region $R --query FunctionUrl --output text
